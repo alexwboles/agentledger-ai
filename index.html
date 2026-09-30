@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentLedger — Agent Inventory &amp; Risk Register</title>
+<meta name="description" content="AgentLedger: a free, self-hosted register of every AI agent in your estate — what each one can reach, how risky it is, and what to do about it. Runs 100% in your browser.">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="brand">
+    <div class="brand-k">Est. 2026 · Folio Nº 001 · Solo-operator edition</div>
+    <h1>AgentLedger <span class="thin">— the register of agents</span></h1>
+    <p class="brand-sub">Every AI agent you run, <em>what it can reach</em>, how risky it is, and what to do about it.
+    AgentLedger <em>documents and scores</em> — it suggests what to revoke, it never pretends to be a firewall.</p>
+  </div>
+  <div class="mast-actions">
+    <button class="btn ghost" id="btn-add">+ Register agent</button>
+    <button class="btn ghost" id="btn-reset">Restore demo</button>
+    <button class="btn primary" id="btn-export">Export audit pack</button>
+  </div>
+</header>
+
+<section class="kpis" id="kpis" aria-label="Estate key figures"></section>
+
+<main class="layout">
+  <section class="panel" aria-label="Risk map">
+    <div class="panel-head">
+      <h2>Risk map <span class="n">— the estate at a glance</span></h2>
+      <span class="panel-hint">Agents on the inner ring, tools on the outer ring</span>
+    </div>
+    <div id="mapwrap"></div>
+    <div class="blast" id="blast"></div>
+    <div class="map-legend">
+      <span><i style="background:#4caf7d"></i>low risk</span>
+      <span><i style="background:#d9a441"></i>medium risk</span>
+      <span><i style="background:#e0604f"></i>high risk</span>
+      <span><span class="dash-demo"></span>shadow / unregistered</span>
+      <span>number on node = risk score</span>
+    </div>
+  </section>
+
+  <aside class="panel" aria-label="Findings">
+    <div id="findings"></div>
+  </aside>
+</main>
+
+<section class="section">
+  <div class="section-head">
+    <h2>The registry <span class="n">— every agent, on the books</span></h2>
+  </div>
+  <p class="section-sub">One-click governance: <b>sanctioned</b> means approved, <b>review</b> means decide soon, <b>blocked</b> means pull its access. Changing a status here only updates the record — you still revoke the real credential yourself.</p>
+  <div id="registry"></div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>Shadow check <span class="n">— what did we miss?</span></h2>
+  </div>
+  <p class="section-sub">Discovery scans five local sources and compares them against your registered agents. Anything found but not registered is a shadow agent — the ones that skip every control you set up.</p>
+  <div class="panel" id="shadow"></div>
+</section>
+
+<footer>
+  <div class="fine">AgentLedger is a self-hosted documentation and scoring tool. It cannot see your real credentials, enforce blocks, or revoke access — every "recommended" action is a suggestion for you to carry out. Data stays in this browser (localStorage); nothing leaves your machine.</div>
+  <div>AgentLedger · product Nº 55 · free &amp; local-first</div>
+</footer>
+
+<div id="scrim"></div>
+<aside id="drawer" aria-label="Agent details"></aside>
+<div id="modal" role="dialog" aria-modal="true"><div id="modal-body"></div></div>
+<div id="toast" role="status"></div>
+
+<script src="js/data.js"></script>
+<script src="js/risk.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
