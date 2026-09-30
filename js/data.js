@@ -1,0 +1,195 @@
+/* AgentLedger seed data + preset library.
+ * UMD: usable from the browser (window.AgentLedgerData) and from node (require).
+ */
+(function (root, factory) {
+  if (typeof module !== "undefined" && module.exports) module.exports = factory();
+  else root.AgentLedgerData = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+
+  // ---------------------------------------------------------------- tools
+  // kind: saas | api | db | mcp | cli | extension | local
+  var TOOLS = {
+    "github":       { id: "github",       name: "GitHub",            kind: "saas",      desc: "Code hosting, repos, actions" },
+    "openai-api":   { id: "openai-api",   name: "OpenAI API",        kind: "api",       desc: "Model completions + embeddings" },
+    "gmail":        { id: "gmail",         name: "Gmail",             kind: "saas",      desc: "Inbox + send-as-you mail" },
+    "sheets":       { id: "sheets",        name: "Google Sheets",     kind: "saas",      desc: "Spreadsheets, client lists" },
+    "stripe":       { id: "stripe",        name: "Stripe",            kind: "saas",      desc: "Payments, customers, invoices" },
+    "slack":        { id: "slack",         name: "Slack webhook",     kind: "saas",      desc: "Posts into #ops channel" },
+    "local-fs":     { id: "local-fs",      name: "Local filesystem",  kind: "local",     desc: "Reads/writes your home dir" },
+    "shell":        { id: "shell",          name: "Shell / terminal",  kind: "cli",       desc: "Runs arbitrary commands" },
+    "mcp-fs":       { id: "mcp-fs",        name: "Filesystem MCP",    kind: "mcp",       desc: "MCP server: file tools for agents" },
+    "prod-postgres":{ id: "prod-postgres", name: "Prod Postgres",     kind: "db",        desc: "Production customer database" },
+    "smtp":         { id: "smtp",          name: "SMTP relay",        kind: "api",       desc: "Bulk outbound email" },
+    "browser-ext":  { id: "browser-ext",   name: "Browser extension", kind: "extension", desc: "Reads page content, fills forms" },
+    "notion":       { id: "notion",        name: "Notion",            kind: "saas",      desc: "Docs + project wiki" }
+  };
+
+  // -------------------------------------------------------------- agents
+  // status: sanctioned | review | blocked
+  // perms: read | write | send | admin
+  // data: PII | secrets | prod-db | code | none
+  var AGENTS = [
+    {
+      id: "cursor", name: "Cursor", owner: "Alex", platform: "Desktop app",
+      purpose: "AI pair-programmer inside the IDE",
+      intent: "Write and edit code in open projects; never touch credentials or run deploys.",
+      drift: false, driftNote: "",
+      status: "sanctioned", registered: true,
+      tools: [
+        { tool: "github", perms: ["read", "write"] },
+        { tool: "local-fs", perms: ["read", "write"] },
+        { tool: "openai-api", perms: ["read"] }
+      ],
+      data: ["code", "secrets"], humanReview: true,
+      tokenAgeDays: 12, lastActivityDays: 0,
+      costPerMonth: 20, hoursSaved: 24
+    },
+    {
+      id: "claude-code", name: "Claude Code", owner: "Alex", platform: "CLI",
+      purpose: "Terminal coding agent for refactors and scripts",
+      intent: "Refactor code and run repo scripts on request; ask before git push.",
+      drift: false, driftNote: "",
+      status: "sanctioned", registered: true,
+      tools: [
+        { tool: "github", perms: ["read", "write"] },
+        { tool: "shell", perms: ["write"] },
+        { tool: "mcp-fs", perms: ["read", "write"] }
+      ],
+      data: ["code"], humanReview: true,
+      tokenAgeDays: 100, lastActivityDays: 1,
+      costPerMonth: 0, hoursSaved: 18
+    },
+    {
+      id: "n8n-triage", name: "n8n · Email Triage", owner: "Alex", platform: "n8n (self-hosted)",
+      purpose: "Labels incoming mail, drafts replies, posts summaries to Slack",
+      intent: "Read inbox, draft (never send) replies, post a daily summary to #ops.",
+      drift: true, driftNote: "Started summarizing Slack DMs it was never asked to watch.",
+      status: "sanctioned", registered: true,
+      tools: [
+        { tool: "gmail", perms: ["read"] },
+        { tool: "sheets", perms: ["read", "write"] },
+        { tool: "slack", perms: ["send"] },
+        { tool: "openai-api", perms: ["read"] }
+      ],
+      data: ["PII"], humanReview: true,
+      tokenAgeDays: 120, lastActivityDays: 0,
+      costPerMonth: 0, hoursSaved: 10
+    },
+    {
+      id: "copilot", name: "GitHub Copilot", owner: "Alex", platform: "IDE extension",
+      purpose: "Inline code completions",
+      intent: "Suggest code in the editor; no repo writes, no shell.",
+      drift: false, driftNote: "",
+      status: "sanctioned", registered: true,
+      tools: [
+        { tool: "github", perms: ["read"] }
+      ],
+      data: ["code"], humanReview: true,
+      tokenAgeDays: 30, lastActivityDays: 0,
+      costPerMonth: 10, hoursSaved: 8
+    },
+    {
+      id: "automailer", name: "AutoMailer", owner: "Alex", platform: "Custom node script",
+      purpose: "Sends follow-up emails to stale leads",
+      intent: "Send templated follow-ups from a reviewed list, once a week.",
+      drift: true, driftNote: "Now picks its own recipients from the inbox, not the reviewed list.",
+      status: "review", registered: true,
+      tools: [
+        { tool: "gmail", perms: ["read", "send"] },
+        { tool: "smtp", perms: ["send"] }
+      ],
+      data: ["PII"], humanReview: false,
+      tokenAgeDays: 210, lastActivityDays: 2,
+      costPerMonth: 0, hoursSaved: 6
+    },
+    {
+      id: "backup-bot", name: "BackupBot", owner: "Alex", platform: "Cron script",
+      purpose: "Nightly backup of client sheets to local disk",
+      intent: "Copy two client spreadsheets to encrypted local backup nightly.",
+      drift: false, driftNote: "",
+      status: "sanctioned", registered: true,
+      tools: [
+        { tool: "sheets", perms: ["read"] },
+        { tool: "local-fs", perms: ["write"] }
+      ],
+      data: ["PII"], humanReview: true,
+      tokenAgeDays: 45, lastActivityDays: 0,
+      costPerMonth: 0, hoursSaved: 2
+    },
+    {
+      id: "invoice-sync", name: "n8n · InvoiceSync", owner: "Alex", platform: "n8n (self-hosted)",
+      purpose: "Copies paid Stripe invoices into the finance sheet",
+      intent: "Read paid invoices, append rows to the finance sheet. No refunds, no edits.",
+      drift: false, driftNote: "",
+      status: "sanctioned", registered: true,
+      tools: [
+        { tool: "stripe", perms: ["read"] },
+        { tool: "sheets", perms: ["write"] }
+      ],
+      data: ["PII"], humanReview: true,
+      tokenAgeDays: 40, lastActivityDays: 1,
+      costPerMonth: 0, hoursSaved: 4
+    },
+    // ---- shadow: discovered, never registered --------------------------------
+    {
+      id: "invoice-watcher", name: "InvoiceWatcher", owner: "unknown", platform: "Unknown script",
+      purpose: "Unknown — watches inbox and posts to Slack",
+      intent: "No stated intent on file.",
+      drift: false, driftNote: "",
+      status: "review", registered: false, discoveredBy: ["SaaS OAuth grants", "Local daemons"],
+      tools: [
+        { tool: "gmail", perms: ["read"] },
+        { tool: "slack", perms: ["send"] }
+      ],
+      data: ["PII"], humanReview: false,
+      tokenAgeDays: 200, lastActivityDays: 3,
+      costPerMonth: 0, hoursSaved: 0
+    },
+    {
+      id: "chatgpt-browser", name: "ChatGPT (browser)", owner: "Alex", platform: "Browser",
+      purpose: "Ad-hoc ChatGPT use with page access",
+      intent: "Answer questions in the browser tab; not for work data.",
+      drift: true, driftNote: "Used for client work tasks outside its stated purpose.",
+      status: "review", registered: false, discoveredBy: ["Browser extensions"],
+      tools: [
+        { tool: "browser-ext", perms: ["read", "write"] }
+      ],
+      data: ["PII", "secrets"], humanReview: true,
+      tokenAgeDays: 150, lastActivityDays: 0,
+      costPerMonth: 20, hoursSaved: 5
+    }
+  ];
+
+  // ------------------------------------------------------- discovery sources
+  // Simulated local discovery: config files, CLIs, extensions, OAuth, daemons.
+  var DISCOVERY = [
+    { id: "mcp-config",  name: "MCP configs",       where: "~/.mcp.json · Claude config",        found: ["Cursor", "Claude Code"] },
+    { id: "cli-tools",   name: "CLI tools",         where: "npx history · installed CLIs",       found: ["Claude Code", "GitHub Copilot"] },
+    { id: "extensions",  name: "Browser extensions",where: "Chrome/Firefox extension list",      found: ["ChatGPT (browser)"] },
+    { id: "oauth",       name: "SaaS OAuth grants", where: "Google · Slack · Stripe app grants", found: ["n8n · Email Triage", "n8n · InvoiceSync", "AutoMailer", "InvoiceWatcher"] },
+    { id: "daemons",     name: "Local daemons",     where: "cron · launchd · systemd timers",    found: ["BackupBot", "AutoMailer", "InvoiceWatcher"] }
+  ];
+
+  // ------------------------------------------------------- preset library
+  var PRESET_AGENTS = [
+    { name: "Cursor", platform: "Desktop app", purpose: "AI pair-programmer inside the IDE" },
+    { name: "Claude Code", platform: "CLI", purpose: "Terminal coding agent for refactors and scripts" },
+    { name: "GitHub Copilot", platform: "IDE extension", purpose: "Inline code completions" },
+    { name: "ChatGPT", platform: "Web app", purpose: "Ad-hoc chat assistant" },
+    { name: "n8n workflow", platform: "n8n (self-hosted)", purpose: "Automation workflow" },
+    { name: "Custom script", platform: "Custom script", purpose: "Describe what it does…" }
+  ];
+
+  var PRESET_TOOLS = Object.keys(TOOLS).map(function (id) {
+    return { id: id, name: TOOLS[id].name, kind: TOOLS[id].kind };
+  });
+
+  return {
+    TOOLS: TOOLS,
+    AGENTS: AGENTS,
+    DISCOVERY: DISCOVERY,
+    PRESET_AGENTS: PRESET_AGENTS,
+    PRESET_TOOLS: PRESET_TOOLS,
+    HOURLY_RATE: 80
+  };
+});
