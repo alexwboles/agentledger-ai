@@ -38,6 +38,7 @@ let pass = 0, fail = 0;
 const ok  = (n) => { pass++; console.log('PASS: ' + n); };
 const bad = (n) => { fail++; console.log('FAIL: ' + n); };
 const byId = (id) => D.AGENTS.filter(a => a.id === id)[0];
+const clone = (o) => JSON.parse(JSON.stringify(o));
 
 // --- seed shape
 (byId('automailer') && D.AGENTS.length === 9 && Object.keys(D.TOOLS).length === 13)
@@ -108,10 +109,41 @@ R.validateAgent(byId('cursor')).length === 0 ? ok('validateAgent accepts a good 
 (R.riskColor(75) === '#e0604f' && R.riskColor(45) === '#d9a441' && R.riskColor(10) === '#4caf7d')
   ? ok('risk colors: high red / medium amber / low emerald') : bad('risk colors wrong');
 
+
+// --- review cadence / incidents / backup API
+['reviewCadence','nextReviewISO','reviewsDue','exportLedger','importLedger','todayISO'].forEach(f => {
+  if (typeof R[f] !== 'function') throw new Error('missing ' + f);
+});
+ok('risk engine exports review + backup API');
+const lo = clone(byId('cursor'));
+lo.tools = [{ tool: 'github', perms: ['read'] }]; lo.data = ['code']; lo.humanReview = true; lo.tokenAgeDays = 5; lo.lastActivityDays = 0;
+if (R.reviewCadence(lo) !== 180) throw new Error('low-risk cadence should be 180d');
+lo.lastReviewDate = '2026-10-01';
+if (R.reviewsDue([lo], '2026-10-02').length !== 0) throw new Error('freshly reviewed agent must not be due');
+if (R.reviewsDue([lo], '2027-04-01').length !== 1) throw new Error('agent past cadence must be due');
+ok('review cadence: 30/90/180d by band, due-list honors lastReviewDate');
+const inc = clone(byId('cursor'));
+const b0 = R.computeRisk(inc).score;
+inc.incidents = [{ date: '2026-10-01', title: 'x', detail: '' }];
+if (!(R.computeRisk(inc).score > b0)) throw new Error('incident should raise risk');
+ok('incident history is a scored risk factor');
+const rt = R.importLedger(R.exportLedger({ agents: D.AGENTS }));
+if (rt.errors.length || rt.agents.length !== D.AGENTS.length) throw new Error('backup round-trip failed');
+ok('ledger backup export/import round-trips');
+
 console.log('NODE_PASS=' + pass + ' NODE_FAIL=' + fail);
 process.exit(fail ? 1 : 0);
 NODEEOF
 [ $? -eq 0 ] && ok "node logic checks green" || bad "node logic checks had failures"
+
+for id in reviews btn-backup btn-restore restore-file; do
+  grep -q "id=\"$id\"" index.html || { bad "missing #$id in index.html"; }
+done
+ok "reviews/backup UI ids present"
+for n in renderReviews markReviewed btn-reviewed btn-inc inc-title exportLedger importLedger backupLedger restoreLedger; do
+  grep -q "$n" js/app.js || { bad "missing wiring: $n"; }
+done
+ok "app.js wires reviews/incidents/backup"
 
 echo "---"
 echo "smoke: $PASS passed, $FAIL failed"

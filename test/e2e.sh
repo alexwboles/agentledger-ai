@@ -89,6 +89,49 @@ try {
   (m.indexOf('Total agents: 0') !== -1) ? ok('flow8: empty estate exports cleanly') : bad('flow8: empty export wrong');
 } catch (err) { bad('flow8: threw on empty estate: ' + err.message); }
 
+
+// Flow 9: review cadence — riskier agents reviewed more often, never-reviewed is due now
+const hi = clone(newcomer); hi.id = 'a-hi'; hi.name = 'Hi';
+hi.tools = [{ tool: 'prod-postgres', perms: ['read'] }, { tool: 'slack', perms: ['send'] },
+  { tool: 'gmail', perms: ['read', 'send'] }];
+hi.humanReview = false;
+const lo = clone(newcomer); lo.id = 'a-lo'; lo.name = 'Lo';
+lo.tools = [{ tool: 'github', perms: ['read'] }]; lo.data = ['code']; lo.humanReview = true; lo.tokenAgeDays = 5;
+(R.reviewCadence(hi) === 30) ? ok('flow9: high-risk agent cadence 30d') : bad('flow9 hi cadence=' + R.reviewCadence(hi));
+(R.reviewCadence(lo) === 180) ? ok('flow9: low-risk agent cadence 180d') : bad('flow9 lo cadence=' + R.reviewCadence(lo));
+const due9 = R.reviewsDue([hi, lo], '2026-10-12');
+(due9.length === 2 && due9[0].agent.id === 'a-hi')
+  ? ok('flow9: never-reviewed agents are due, riskiest first') : bad('flow9 due=' + JSON.stringify(due9.map(x => x.agent.id)));
+hi.lastReviewDate = '2026-10-01';
+const due9b = R.reviewsDue([hi, lo], '2026-10-12');
+(due9b.length === 1 && due9b[0].agent.id === 'a-lo')
+  ? ok('flow9: recently-reviewed high-risk agent drops off the due list') : bad('flow9b due=' + JSON.stringify(due9b.map(x => x.agent.id)));
+(R.nextReviewISO(hi, '2026-10-12') === '2026-10-31')
+  ? ok('flow9: next review = lastReview + 30d cadence') : bad('flow9 next=' + R.nextReviewISO(hi, '2026-10-12'));
+
+// Flow 10: incident log — incidents raise the risk score, then clear
+const inc = clone(newcomer); inc.id = 'a-inc'; inc.name = 'Inc';
+const baseScore = R.computeRisk(inc).score;
+inc.incidents = [{ date: '2026-10-01', title: 'Sent mail without approval', detail: 'test' }];
+const s1 = R.computeRisk(inc);
+(s1.score > baseScore && s1.factors.some(f => f.id === 'incidents'))
+  ? ok('flow10: logged incident raises risk ' + baseScore + ' -> ' + s1.score) : bad('flow10: incident not factored');
+inc.incidents.push({ date: '2026-10-05', title: 'Second incident', detail: '' });
+const s2 = R.computeRisk(inc);
+(s2.score > s1.score) ? ok('flow10: repeat incidents compound (' + s1.score + ' -> ' + s2.score + ')') : bad('flow10: no compounding');
+
+// Flow 11: ledger backup round-trips through export/import
+const json = R.exportLedger({ agents: agents });
+const back = R.importLedger(json);
+(back.errors.length === 0 && back.agents.length === agents.length)
+  ? ok('flow11: export -> import round-trips ' + back.agents.length + ' agents cleanly') : bad('flow11: ' + JSON.stringify(back.errors));
+const badImport = R.importLedger('{"agents":[{"name":"NoId"}]}');
+(badImport.agents.length === 0 && badImport.errors.length === 1 && badImport.skipped === 1)
+  ? ok('flow11: invalid agents rejected with errors') : bad('flow11: bad import accepted');
+const notJson = R.importLedger('nope');
+(notJson.errors.length === 1) ? ok('flow11: non-JSON rejected') : bad('flow11: non-JSON accepted');
+
+console.log('---');
 console.log('---');
 console.log('e2e: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

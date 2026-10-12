@@ -422,3 +422,28 @@ footer .fine { max-width: 620px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ---------- feature batch: reviews due, incidents, backup ---------- */
+.reviews {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 14px 0 0; padding: 10px 16px;
+  border: 1px solid var(--line); background: var(--card); border-radius: 0;
+  font-size: 13px;
+}
+.rev-k { font-weight: 700; text-transform: uppercase; letter-spacing: .6px; font-size: 11.5px; color: #b34100; }
+.rev-ok { color: var(--muted); font-size: 13px; }
+.rev-item {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  border: 1px solid var(--line); background: #fff; border-radius: 0;
+  padding: 5px 10px; font-size: 12.5px; font-family: inherit;
+}
+.rev-item:hover { border-color: #b34100; }
+.rev-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.rev-when { color: var(--muted); font-size: 11.5px; }
+.rev-more { color: var(--muted); font-size: 12px; }
+.inc { border-bottom: 1px solid var(--line-soft, #eee); padding: 7px 0; font-size: 13px; }
+.inc-form { display: grid; gap: 8px; margin-top: 10px; }
+.inc-form input {
+  border: 1px solid var(--line); border-radius: 0; padding: 8px 10px;
+  font-size: 13px; font-family: inherit; width: 100%; box-sizing: border-box;
+}

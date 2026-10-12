@@ -146,6 +146,17 @@
       });
     }
 
+    var inc = agent.incidents || [];
+    if (inc.length) {
+      factors.push({
+        id: "incidents", label: "Incident history (" + inc.length + ")", severity: "warn",
+        weight: Math.min(20, 8 + 4 * (inc.length - 1)),
+        problem: inc.length + " logged incident" + (inc.length === 1 ? "" : "s") +
+          " — latest: " + (inc[inc.length - 1].title || "untitled") + ".",
+        fix: "Review the incident log in the agent record; repeat offenders should be blocked, not just watched."
+      });
+    }
+
     return factors;
   }
 
@@ -347,6 +358,78 @@
     return lines.join("\n");
   }
 
+  // ----------------------------------------------------- review cadence
+  function addDaysISO(iso, days) {
+    var d = new Date(iso + "T12:00:00");
+    d.setDate(d.getDate() + days);
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+
+  function todayISO() {
+    var d = new Date();
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+
+  /** Review cadence in days: riskier agents get reviewed more often. */
+  function reviewCadence(agent) {
+    var band = computeRisk(agent).band;
+    return band === "high" ? 30 : band === "medium" ? 90 : 180;
+  }
+
+  /** Next review date: lastReviewDate + cadence. Never reviewed → due now. */
+  function nextReviewISO(agent, today) {
+    var now = today || todayISO();
+    if (!agent.lastReviewDate) return now;
+    return addDaysISO(agent.lastReviewDate, reviewCadence(agent));
+  }
+
+  /** Agents whose next review is today or overdue, riskiest first. */
+  function reviewsDue(agents, today) {
+    var now = today || todayISO();
+    return (agents || []).filter(function (a) { return nextReviewISO(a, now) <= now; })
+      .map(function (a) {
+        return { agent: a, risk: computeRisk(a), nextReview: nextReviewISO(a, now) };
+      })
+      .sort(function (x, y) { return y.risk.score - x.risk.score; });
+  }
+
+  // ----------------------------------------------------- ledger backup
+  function exportLedger(state) {
+    return JSON.stringify({
+      format: "agentledger/v1",
+      exportedAt: new Date().toISOString(),
+      agents: state.agents || []
+    }, null, 2);
+  }
+
+  /**
+   * Parse a ledger backup file. Returns {agents, errors, skipped}.
+   * Every agent must pass validateAgent and have a unique id.
+   */
+  function importLedger(text) {
+    var obj;
+    try { obj = JSON.parse(text); }
+    catch (e) { return { agents: [], errors: ["Not valid JSON."], skipped: 0 }; }
+    var list = obj.agents || obj;
+    if (!Array.isArray(list)) {
+      return { agents: [], errors: ["No agent list found in this file."], skipped: 0 };
+    }
+    var errors = [], agents = [], seen = {};
+    list.forEach(function (a, i) {
+      var errs = validateAgent(a);
+      if (!a.id || seen[a.id]) errs.push("Duplicate or missing id.");
+      if (errs.length) {
+        errors.push("Agent #" + (i + 1) + " (" + ((a && a.name) || "unnamed") + "): " + errs.join(" "));
+        return;
+      }
+      seen[a.id] = true;
+      agents.push(a);
+    });
+    return { agents: agents, errors: errors, skipped: list.length - agents.length };
+  }
+
   return {
     TOXIC_RULES: TOXIC_RULES,
     detectFactors: detectFactors,
@@ -359,6 +442,12 @@
     validateAgent: validateAgent,
     auditMarkdown: auditMarkdown,
     money: money,
-    actionPermCount: actionPermCount
+    actionPermCount: actionPermCount,
+    reviewCadence: reviewCadence,
+    nextReviewISO: nextReviewISO,
+    reviewsDue: reviewsDue,
+    exportLedger: exportLedger,
+    importLedger: importLedger,
+    todayISO: todayISO
   };
 });

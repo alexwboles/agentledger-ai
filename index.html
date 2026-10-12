@@ -19,11 +19,16 @@
   <div class="mast-actions">
     <button class="btn ghost" id="btn-add">+ Register agent</button>
     <button class="btn ghost" id="btn-reset">Restore demo</button>
+    <button class="btn ghost" id="btn-backup">Backup ledger</button>
+    <button class="btn ghost" id="btn-restore">Restore ledger</button>
     <button class="btn primary" id="btn-export">Export audit pack</button>
+    <input type="file" id="restore-file" accept=".json,application/json" hidden>
   </div>
 </header>
 
 <section class="kpis" id="kpis" aria-label="Estate key figures"></section>
+
+<section class="reviews" id="reviews" aria-label="Reviews due"></section>
 
 <main class="layout">
   <section class="panel" aria-label="Risk map">

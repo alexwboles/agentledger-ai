@@ -396,6 +396,18 @@
     Array.prototype.forEach.call(byId("drawer").querySelectorAll(".dtab"), function (btn) {
       btn.addEventListener("click", function () { S.drawerTab = btn.getAttribute("data-tab"); renderDrawer(); });
     });
+    var rb = byId("btn-reviewed");
+    if (rb) rb.addEventListener("click", function () { markReviewed(a.id); });
+    var ib = byId("btn-inc");
+    if (ib) ib.addEventListener("click", function () {
+      var title = byId("inc-title").value.trim();
+      if (!title) { toast("Give the incident a title first."); return; }
+      a.incidents = (a.incidents || []).concat([{
+        date: R.todayISO(), title: title, detail: byId("inc-detail").value.trim()
+      }]);
+      saveState(); renderAll();
+      toast("Incident logged on " + a.name + ".");
+    });
   }
 
   function drawerTab(a, r) {
@@ -445,8 +457,24 @@
     }
     if (S.drawerTab === "activity") {
       var pct = Math.min(100, Math.round(((a.tokenAgeDays || 0) / 365) * 100));
+      var cad = R.reviewCadence(a);
+      var next = R.nextReviewISO(a);
+      var inc = a.incidents || [];
+      var reviewHtml = '<div class="act-block"><div class="act-k">Governance review</div>' +
+        '<div class="act-v">Last reviewed: <b>' + (a.lastReviewDate ? esc(a.lastReviewDate) : 'never') + '</b></div>' +
+        '<div class="act-v">Cadence: every <b>' + cad + ' days</b> (' + r.band + ' risk) · next due <b>' + esc(next) + '</b></div>' +
+        '<button class="btn small" id="btn-reviewed">Mark reviewed today</button></div>';
+      var incHtml = '<div class="act-block"><div class="act-k">Incident log (' + inc.length + ')</div>' +
+        (inc.length ? inc.slice().reverse().map(function (x) {
+          return '<div class="inc"><b>' + esc(x.date || '') + '</b> — <b>' + esc(x.title || 'untitled') + '</b>' +
+            (x.detail ? '<div class="td-sub">' + esc(x.detail) + '</div>' : '') + '</div>';
+        }).join("") : '<p class="dim">No incidents logged. Log one when an agent misbehaves, leaks data, or drifts — it raises the risk score.</p>') +
+        '<div class="inc-form"><input id="inc-title" placeholder="Incident title — e.g. Sent mail without approval" maxlength="120">' +
+        '<input id="inc-detail" placeholder="What happened (optional)" maxlength="300">' +
+        '<button class="btn small" id="btn-inc">Log incident</button></div></div>';
       return '<div class="act-block"><div class="act-k">Stated intent</div><blockquote>' + esc(a.intent || a.purpose) + '</blockquote></div>' +
         (a.drift ? '<div class="act-block warnbox"><div class="act-k">Drift detected</div><p>' + esc(a.driftNote || "Behavior differs from stated intent.") + '</p></div>' : '<div class="act-block okbox"><div class="act-k">Drift</div><p>No drift detected — activity matches stated intent.</p></div>') +
+        reviewHtml + incHtml +
         '<div class="act-grid">' +
         '<div><div class="act-k">Credential age</div><div class="meter"><div class="meter-fill' + ((a.tokenAgeDays || 0) > 90 ? " bad" : "") + '" style="width:' + pct + '%"></div></div><div class="act-v">' + a.tokenAgeDays + ' days (guideline: 90)</div></div>' +
         '<div><div class="act-k">Last activity</div><div class="act-v">' + (a.lastActivityDays === 0 ? "today" : a.lastActivityDays + " day(s) ago") + '</div></div>' +
@@ -657,6 +685,38 @@
     toast("Audit pack exported as Markdown.");
   }
 
+  function backupLedger() {
+    var json = R.exportLedger({ agents: S.agents });
+    var date = new Date().toISOString().slice(0, 10);
+    var blob = new Blob([json], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "agentledger-backup-" + date + ".json";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    toast("Ledger backed up as JSON.");
+  }
+
+  function restoreLedger(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var res = R.importLedger(reader.result);
+      if (!res.agents.length) {
+        toast("Restore failed: " + (res.errors[0] || "no valid agents found."));
+        return;
+      }
+      var msg = "Restore " + res.agents.length + " agent(s) from backup? This replaces your current ledger." +
+        (res.errors.length ? "\n\n" + res.skipped + " record(s) skipped:\n" + res.errors.slice(0, 5).join("\n") : "");
+      if (!window.confirm(msg)) return;
+      S.agents = res.agents;
+      S.selected = null; S.blast = null; S.drawer = null;
+      saveState(); renderAll();
+      toast("Ledger restored: " + res.agents.length + " agents.");
+    };
+    reader.readAsText(file);
+  }
+
   // --------------------------------------------------------------- render
   function renderAll() {
     renderKpis();
@@ -664,11 +724,49 @@
     renderFindings();
     renderRegistry();
     renderShadow();
+    renderReviews();
     if (S.drawer) renderDrawer();
+  }
+
+  // ------------------------------------------------- reviews due strip
+  function renderReviews() {
+    var box = byId("reviews");
+    if (!box) return;
+    var due = R.reviewsDue(S.agents);
+    if (!due.length) {
+      box.innerHTML = '<span class="rev-ok">✓ Every agent is inside its review cadence.</span>';
+      return;
+    }
+    box.innerHTML = '<span class="rev-k">' + due.length + ' review' + (due.length === 1 ? '' : 's') +
+      ' due</span>' + due.slice(0, 6).map(function (x) {
+        var overdue = x.nextReview < R.todayISO();
+        return '<button class="rev-item" data-agent="' + x.agent.id + '">' +
+          '<span class="rev-dot" style="background:' + R.riskColor(x.risk.score) + '"></span>' +
+          esc(x.agent.name) +
+          '<span class="rev-when">' + (overdue ? 'overdue since ' : 'due ') + esc(x.nextReview) + '</span></button>';
+      }).join("") +
+      (due.length > 6 ? '<span class="rev-more">+' + (due.length - 6) + ' more</span>' : '');
+    Array.prototype.forEach.call(box.querySelectorAll(".rev-item"), function (b) {
+      b.addEventListener("click", function () { openDrawer(b.getAttribute("data-agent"), "activity"); });
+    });
+  }
+
+  function markReviewed(id) {
+    var a = getAgent(id);
+    if (!a) return;
+    a.lastReviewDate = R.todayISO();
+    saveState(); renderAll();
+    toast(a.name + " marked reviewed — next review " + R.nextReviewISO(a) + ".");
   }
 
   function wire() {
     byId("btn-export").addEventListener("click", exportPack);
+    byId("btn-backup").addEventListener("click", backupLedger);
+    byId("btn-restore").addEventListener("click", function () { byId("restore-file").click(); });
+    byId("restore-file").addEventListener("change", function (e) {
+      if (e.target.files && e.target.files[0]) restoreLedger(e.target.files[0]);
+      e.target.value = "";
+    });
     byId("btn-add").addEventListener("click", function () { openModal(null); });
     byId("btn-reset").addEventListener("click", function () {
       if (window.confirm("Restore the seeded demo data? Your local changes will be discarded.")) resetDemo();
