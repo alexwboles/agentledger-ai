@@ -131,6 +131,47 @@ const rt = R.importLedger(R.exportLedger({ agents: D.AGENTS }));
 if (rt.errors.length || rt.agents.length !== D.AGENTS.length) throw new Error('backup round-trip failed');
 ok('ledger backup export/import round-trips');
 
+// --- risk history + trends
+['recordRiskSnapshot','riskTrend','fixPlanProgress','toggleFix','pendingFixes'].forEach(f => {
+  if (typeof R[f] !== 'function') throw new Error('missing ' + f);
+});
+ok('risk engine exports history + remediation API');
+const ha = clone(byId('cursor'));
+R.recordRiskSnapshot(ha, '2026-10-01');
+R.recordRiskSnapshot(ha, '2026-10-01'); // same day refreshes, does not append
+if (ha.scoreHistory.length !== 1) throw new Error('same-day snapshot should not append');
+ha.scoreHistory.push({ d: '2026-10-13', s: R.computeRisk(ha).score });
+const tr = R.riskTrend(ha, 30);
+if (!tr || typeof tr.delta !== 'number') throw new Error('trend should compute delta');
+if (R.riskTrend(clone(byId('copilot'))) !== null) throw new Error('trend needs >=2 days of history');
+ok('risk history: one snapshot per day, trend delta computed');
+const cap = clone(byId('cursor'));
+for (let i = 0; i < 95; i++) {
+  const d = new Date(2026, 0, 1); d.setDate(d.getDate() + i);
+  R.recordRiskSnapshot(cap, d.toISOString().slice(0, 10));
+}
+if (cap.scoreHistory.length !== 90) throw new Error('history should cap at 90, got ' + cap.scoreHistory.length);
+ok('risk history caps at 90 snapshots');
+
+// --- remediation planner
+const ra = clone(byId('automailer'));
+const p0 = R.fixPlanProgress(ra);
+if (p0.projected !== p0.score || p0.doneCount !== 0) throw new Error('fresh plan: nothing done');
+const heaviest = p0.factors.slice().sort((x, y) => y.weight - x.weight)[0];
+R.toggleFix(ra, heaviest.id);
+const p1 = R.fixPlanProgress(ra);
+if (p1.doneCount !== 1) throw new Error('fix not marked done');
+if (p1.projected !== Math.max(0, p0.score - heaviest.weight)) throw new Error('projected score wrong: ' + p1.projected);
+R.toggleFix(ra, heaviest.id);
+if (R.fixPlanProgress(ra).doneCount !== 0) throw new Error('toggle-off failed');
+const pend = R.pendingFixes([ra]);
+if (!pend.length) throw new Error('pendingFixes empty for high-risk agent');
+for (let i = 1; i < pend.length; i++) { if (pend[i].weight > pend[i-1].weight) throw new Error('pendingFixes not sorted heaviest-first'); }
+ok('remediation planner: toggle, projected score, pending-first ordering');
+const md2 = R.auditMarkdown({ agents: D.AGENTS }, D.HOURLY_RATE);
+if (md2.indexOf('## Remediation plan') === -1) throw new Error('audit pack missing Remediation plan');
+ok('audit pack gains a Remediation plan section');
+
 console.log('NODE_PASS=' + pass + ' NODE_FAIL=' + fail);
 process.exit(fail ? 1 : 0);
 NODEEOF
@@ -144,6 +185,18 @@ for n in renderReviews markReviewed btn-reviewed btn-inc inc-title exportLedger 
   grep -q "$n" js/app.js || { bad "missing wiring: $n"; }
 done
 ok "app.js wires reviews/incidents/backup"
+
+# second sweep: filters, trends, remediation
+for id in reg-filters reg-q reg-band reg-status reg-count; do
+  grep -q "id=\"$id\"" index.html || { bad "missing #$id in index.html"; }
+done
+ok "registry filter UI ids present"
+for n in regFiltered trendArrow fix-check spark snapshotAll toggleFix recordRiskSnapshot riskTrend fixPlanProgress; do
+  grep -q "$n" js/app.js || { bad "missing wiring: $n"; }
+done
+ok "app.js wires filters + trend + remediation planner"
+grep -q "## Remediation plan" js/risk.js || bad "risk.js missing remediation section"
+grep -q "Remediation plan" README.md || bad "README missing remediation feature"
 
 echo "---"
 echo "smoke: $PASS passed, $FAIL failed"

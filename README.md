@@ -29,6 +29,12 @@ One static page that keeps the ledger:
 - **Shadow check** — simulated local discovery (MCP configs, CLI tools, browser extensions, SaaS OAuth, daemons) compared against your registered agents: *"you registered 7, we found 9."*
 - **Value line** — cost/mo + hours saved → estimated operator-time value per agent.
 - **Audit pack export** — one click downloads the full inventory + risk summary as Markdown.
+- **Review cadence** — 30/90/180-day review schedule by risk band, with a "reviews due" strip and per-agent Mark-reviewed.
+- **Incident log** — per-agent incidents that raise the risk score and compound with repeats.
+- **Ledger backup/restore** — JSON export + validated import with duplicate-id rejection.
+- **Risk score history + trends** — a daily risk snapshot per agent, trend arrows (▲/▼/—) in the registry, and a sparkline in the agent drawer.
+- **Remediation planner** — every risk factor becomes a checkable fix with a projected score; the audit pack gains a "Remediation plan" section with pending fixes heaviest first.
+- **Registry search + filters** — search by name/owner/platform plus risk-band and governance-status chips.
 
 ## Run it
 
@@ -45,8 +51,8 @@ To restore the seeded demo data at any time: **Restore demo** (top right).
 ## Tests
 
 ```bash
-bash test/smoke.sh   # file presence, JS syntax, risk-engine spot checks — 15/15 green
-bash test/e2e.sh     # full flows: add agent, blast radius, toxic combos, governance, shadow check, export — 13/13 green
+bash test/smoke.sh   # file presence, JS syntax, risk-engine spot checks — 19/19 green
+bash test/e2e.sh     # full flows: add agent, blast radius, toxic combos, governance, shadow check, export, risk trends, remediation plan — 28/28 green
 ```
 
 Both suites must be green before a release.

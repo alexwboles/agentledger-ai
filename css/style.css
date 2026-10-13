@@ -447,3 +447,57 @@ footer .fine { max-width: 620px; }
   border: 1px solid var(--line); border-radius: 0; padding: 8px 10px;
   font-size: 13px; font-family: inherit; width: 100%; box-sizing: border-box;
 }
+
+/* ------------------------------------------------- second sweep: registry filters */
+/* Sharp-edged filter bar in the auditor's register style. */
+.reg-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin: 0 0 16px; padding: 12px 14px;
+  border: 1px solid var(--hair); border-radius: 0;
+  background: var(--ink2);
+}
+.reg-filters #reg-q {
+  border: 1px solid var(--hair-strong); border-radius: 0;
+  background: var(--ink); color: var(--paper);
+  padding: 8px 12px; font-size: 13px; font-family: var(--sans);
+  min-width: 220px;
+}
+.reg-filters #reg-q::placeholder { color: var(--paper-faint); }
+.reg-filters #reg-q:focus { outline: none; border-color: var(--accent); }
+.fchips { display: flex; gap: 6px; flex-wrap: wrap; }
+.fchip {
+  border: 1px solid var(--hair-strong); border-radius: 0;
+  background: transparent; color: var(--paper-dim);
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+  padding: 7px 11px; cursor: pointer;
+}
+.fchip:hover { border-color: var(--accent); color: var(--paper); }
+.fchip.on { background: var(--accent); border-color: var(--accent); color: var(--ink); font-weight: 700; }
+.reg-count { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--paper-faint); }
+
+/* ------------------------------------------------- second sweep: risk trend */
+.band-sub { min-height: 16px; margin-top: 4px; }
+.trend { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.03em; }
+.trend.up { color: var(--red); }
+.trend.down { color: var(--emerald); }
+.trend.flat { color: var(--paper-faint); }
+
+/* ------------------------------------------------- second sweep: remediation planner */
+.plan-head {
+  border: 1px solid var(--hair); border-radius: 0;
+  background: var(--ink2); padding: 12px 14px; margin-bottom: 12px;
+}
+.plan-k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--accent); }
+.plan-sub { font-size: 13px; color: var(--paper-dim); margin-top: 4px; }
+.plan-sub b { color: var(--paper); }
+.factor { display: flex; gap: 12px; cursor: pointer; }
+.factor-body { flex: 1; min-width: 0; }
+.fix-check { width: 17px; height: 17px; margin-top: 3px; flex-shrink: 0; accent-color: var(--emerald); cursor: pointer; }
+.factor.done { opacity: 0.62; }
+.factor.done .factor-body b { text-decoration: line-through; }
+.fix-done { color: var(--emerald) !important; font-family: var(--mono); font-size: 12px; }
+
+/* ------------------------------------------------- second sweep: score sparkline */
+.spark { width: 100%; max-width: 340px; height: 54px; display: block; margin: 8px 0 4px; }
+.spark-line { fill: none; stroke-width: 2; }
+.spark-dot { stroke: var(--ink); stroke-width: 1; }

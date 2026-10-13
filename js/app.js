@@ -15,8 +15,27 @@
     drawer: null,
     drawerTab: "reach",
     shadowScan: null,   // {done:true, result:{...}}
-    editingId: null
+    editingId: null,
+    regQ: "",
+    regBand: "all",     // all | high | medium | low
+    regStatus: "all"    // all | sanctioned | review | blocked
   };
+
+  // Record one risk snapshot per agent per day, so trends can be drawn.
+  function snapshotAll() {
+    var dirty = false;
+    var today = R.todayISO();
+    S.agents.forEach(function (a) {
+      var h = a.scoreHistory || [];
+      var last = h[h.length - 1];
+      var score = R.computeRisk(a).score;
+      if (!last || last.d !== today || last.s !== score) {
+        R.recordRiskSnapshot(a, today);
+        dirty = true;
+      }
+    });
+    return dirty;
+  }
 
   // ---------------------------------------------------------------- state
   function blankState() {
@@ -30,13 +49,22 @@
         if (s && Array.isArray(s.agents) && s.agents.length) {
           S.agents = s.agents;
           S.shadowScan = s.shadowScan || null;
-          return;
+        } else {
+          var b = blankState();
+          S.agents = b.agents;
+          S.shadowScan = b.shadowScan;
         }
+      } else {
+        var b0 = blankState();
+        S.agents = b0.agents;
+        S.shadowScan = b0.shadowScan;
       }
-    } catch (e) {}
-    var b = blankState();
-    S.agents = b.agents;
-    S.shadowScan = b.shadowScan;
+    } catch (e) {
+      var b2 = blankState();
+      S.agents = b2.agents;
+      S.shadowScan = b2.shadowScan;
+    }
+    if (snapshotAll()) saveState();
   }
   function saveState() {
     try {
@@ -302,8 +330,30 @@
       '<text x="' + cx + '" y="' + (cy + 5) + '" text-anchor="middle" class="dial-n">' + score + '</text></svg>';
   }
 
+  function trendArrow(tr) {
+    if (!tr) return "";
+    var cls = tr.delta > 0 ? "up" : tr.delta < 0 ? "down" : "flat";
+    var glyph = tr.delta > 0 ? "▲" : tr.delta < 0 ? "▼" : "—";
+    return '<span class="trend ' + cls + '">' + glyph + " " + Math.abs(tr.delta) + " pts / 30d</span>";
+  }
+
+  function regFiltered() {
+    var q = (S.regQ || "").toLowerCase().trim();
+    return S.agents.filter(function (a) {
+      var band = riskOf(a).band;
+      if (S.regBand !== "all" && band !== S.regBand) return false;
+      if (S.regStatus !== "all" && a.status !== S.regStatus) return false;
+      if (q) {
+        var hay = [a.name, a.owner, a.platform].join(" ").toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }
+
   function renderRegistry() {
-    var rows = S.agents.map(function (a) {
+    var list = regFiltered();
+    var rows = list.map(function (a) {
       var r = riskOf(a);
       var value = (Number(a.hoursSaved) || 0) * D.HOURLY_RATE;
       var segs = ["sanctioned", "review", "blocked"].map(function (st) {
@@ -311,7 +361,8 @@
       }).join("");
       return '<article class="agent st-' + a.status + (a.id === S.selected ? " sel" : "") + '" data-id="' + esc(a.id) + '">' +
         '<div class="agent-dial">' + dial(r.score) +
-        '<div class="band ' + r.band + '">' + r.band + ' risk</div></div>' +
+        '<div class="band ' + r.band + '">' + r.band + ' risk</div>' +
+        '<div class="band-sub">' + trendArrow(R.riskTrend(a)) + '</div></div>' +
         '<div class="agent-main">' +
         '<div class="agent-top"><h3>' + esc(a.name) + (a.registered ? "" : ' <span class="shadowtag">SHADOW</span>') + '</h3>' +
         '<span class="plat">' + esc(a.platform) + ' · ' + esc(a.owner) + '</span></div>' +
@@ -324,8 +375,14 @@
         '<button class="btn ghost danger" data-act="remove" data-id="' + esc(a.id) + '">Remove</button>' +
         '</div></article>';
     }).join("");
-    byId("registry").innerHTML = rows ||
-      '<p class="empty">No agents on the books. Register your first agent to start the ledger.</p>';
+    var box = byId("registry");
+    box.innerHTML = rows ||
+      '<p class="empty">' + (S.agents.length
+        ? "No agents match the current filters — loosen the search or reset the band/status chips."
+        : "No agents on the books. Register your first agent to start the ledger.") + '</p>';
+    var count = byId("reg-count");
+    if (count) count.textContent = list.length + " of " + S.agents.length + " agents";
+    syncRegFilters();
 
     Array.prototype.forEach.call(byId("registry").querySelectorAll(".seg"), function (btn) {
       btn.addEventListener("click", function (e) {
@@ -340,6 +397,18 @@
         if (act === "details") openDrawer(id, "reach");
         if (act === "edit") openModal(id);
         if (act === "remove") removeAgent(id);
+      });
+    });
+  }
+
+  function syncRegFilters() {
+    var q = byId("reg-q");
+    if (q && q.value !== S.regQ) q.value = S.regQ;
+    [["reg-band", "regBand"], ["reg-status", "regStatus"]].forEach(function (pair) {
+      var el = byId(pair[0]);
+      if (!el) return;
+      Array.prototype.forEach.call(el.querySelectorAll(".fchip"), function (c) {
+        c.classList.toggle("on", c.getAttribute("data-v") === S[pair[1]]);
       });
     });
   }
@@ -408,6 +477,14 @@
       saveState(); renderAll();
       toast("Incident logged on " + a.name + ".");
     });
+    Array.prototype.forEach.call(byId("drawer").querySelectorAll(".fix-check"), function (cb) {
+      cb.addEventListener("change", function () {
+        R.toggleFix(a, cb.getAttribute("data-fix"));
+        saveState();
+        renderAll();
+        toast("Fix plan updated for " + a.name + ".");
+      });
+    });
   }
 
   function drawerTab(a, r) {
@@ -424,13 +501,25 @@
         }).join("") + "</tbody></table>";
     }
     if (S.drawerTab === "risk") {
-      if (!r.factors.length) return '<p class="empty">No risk factors — this agent is clean by every rule in the book.</p>';
-      return r.factors.map(function (f) {
-        return '<div class="factor ' + f.severity + '"><div class="factor-top">' +
+      var plan = R.fixPlanProgress(a);
+      if (!plan.factors.length) return '<p class="empty">No risk factors — this agent is clean by every rule in the book.</p>';
+      var head = '<div class="plan-head"><div class="plan-k">Remediation plan</div>' +
+        '<div class="plan-sub">' + plan.doneCount + " of " + plan.factors.length +
+        " fixed · projected score <b>" + plan.projected + "/100</b> (now " + plan.score + ")" +
+        " · tick a fix off when you carry it out</div></div>";
+      var sorted = plan.factors.slice().sort(function (x, y) { return y.weight - x.weight; });
+      return head + sorted.map(function (f) {
+        var st = (a.fixPlan || {})[f.id];
+        var done = !!(st && st.done);
+        return '<label class="factor ' + f.severity + (done ? " done" : "") + '">' +
+          '<input type="checkbox" class="fix-check" data-fix="' + esc(f.id) + '"' + (done ? " checked" : "") + ">" +
+          '<div class="factor-body"><div class="factor-top">' +
           '<span class="lvl ' + f.severity + '">' + f.severity.toUpperCase() + '</span>' +
           '<b>' + esc(f.label) + '</b><span class="fwt">+' + f.weight + '</span></div>' +
           '<p><span class="pk">Problem —</span> ' + esc(f.problem) + '</p>' +
-          '<p><span class="pk fix">Fix —</span> ' + esc(f.fix) + '</p></div>';
+          '<p><span class="pk fix">Fix —</span> ' + esc(f.fix) + '</p>' +
+          (done ? '<p class="fix-done">✓ carried out ' + esc(st.date || "") + '</p>' : "") +
+          "</div></label>";
       }).join("");
     }
     if (S.drawerTab === "flows") {
@@ -460,6 +549,35 @@
       var cad = R.reviewCadence(a);
       var next = R.nextReviewISO(a);
       var inc = a.incidents || [];
+      var hist = a.scoreHistory || [];
+      var sparkHtml = "";
+      if (hist.length > 1) {
+        var pts = hist.slice(-30);
+        var W = 260, H = 54, pad = 6;
+        var min = Math.min.apply(null, pts.map(function (p) { return p.s; }));
+        var max = Math.max.apply(null, pts.map(function (p) { return p.s; }));
+        var rng = Math.max(1, max - min);
+        var step = (W - pad * 2) / (pts.length - 1);
+        var coords = pts.map(function (p, i) {
+          var x = pad + step * i;
+          var y = H - pad - ((p.s - min) / rng) * (H - pad * 2);
+          return [x.toFixed(1), y.toFixed(1)];
+        });
+        var line = coords.map(function (c) { return c.join(","); }).join(" ");
+        var lastP = coords[coords.length - 1];
+        var col = R.riskColor(pts[pts.length - 1].s);
+        var tr = R.riskTrend(a);
+        sparkHtml = '<div class="act-block"><div class="act-k">Risk score history — daily snapshots</div>' +
+          '<svg class="spark" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Risk score history">' +
+          '<polyline points="' + line + '" class="spark-line" style="stroke:' + col + '"/>' +
+          '<circle cx="' + lastP[0] + '" cy="' + lastP[1] + '" r="3.5" class="spark-dot" style="fill:' + col + '"/>' +
+          "</svg>" +
+          '<div class="act-v">' + esc(pts[0].d) + ": <b>" + pts[0].s + "</b> → " +
+          esc(pts[pts.length - 1].d) + ": <b>" + pts[pts.length - 1].s + "</b> " + trendArrow(tr) + "</div></div>";
+      } else {
+        sparkHtml = '<div class="act-block"><div class="act-k">Risk score history</div>' +
+          '<p class="dim">First snapshot recorded today — the trend line builds over the next few days.</p></div>';
+      }
       var reviewHtml = '<div class="act-block"><div class="act-k">Governance review</div>' +
         '<div class="act-v">Last reviewed: <b>' + (a.lastReviewDate ? esc(a.lastReviewDate) : 'never') + '</b></div>' +
         '<div class="act-v">Cadence: every <b>' + cad + ' days</b> (' + r.band + ' risk) · next due <b>' + esc(next) + '</b></div>' +
@@ -472,7 +590,8 @@
         '<div class="inc-form"><input id="inc-title" placeholder="Incident title — e.g. Sent mail without approval" maxlength="120">' +
         '<input id="inc-detail" placeholder="What happened (optional)" maxlength="300">' +
         '<button class="btn small" id="btn-inc">Log incident</button></div></div>';
-      return '<div class="act-block"><div class="act-k">Stated intent</div><blockquote>' + esc(a.intent || a.purpose) + '</blockquote></div>' +
+      return sparkHtml +
+        '<div class="act-block"><div class="act-k">Stated intent</div><blockquote>' + esc(a.intent || a.purpose) + '</blockquote></div>' +
         (a.drift ? '<div class="act-block warnbox"><div class="act-k">Drift detected</div><p>' + esc(a.driftNote || "Behavior differs from stated intent.") + '</p></div>' : '<div class="act-block okbox"><div class="act-k">Drift</div><p>No drift detected — activity matches stated intent.</p></div>') +
         reviewHtml + incHtml +
         '<div class="act-grid">' +
@@ -774,6 +893,19 @@
     byId("scrim").addEventListener("click", function () { closeDrawer(); closeModal(); });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") { closeDrawer(); closeModal(); }
+    });
+    // Registry filters: search + band + status chips.
+    var q = byId("reg-q");
+    if (q) q.addEventListener("input", function () { S.regQ = q.value; renderRegistry(); });
+    [["reg-band", "regBand"], ["reg-status", "regStatus"]].forEach(function (pair) {
+      var el = byId(pair[0]);
+      if (!el) return;
+      Array.prototype.forEach.call(el.querySelectorAll(".fchip"), function (c) {
+        c.addEventListener("click", function () {
+          S[pair[1]] = c.getAttribute("data-v");
+          renderRegistry();
+        });
+      });
     });
   }
 

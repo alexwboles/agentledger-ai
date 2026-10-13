@@ -57,6 +57,22 @@
     <h2>The registry <span class="n">— every agent, on the books</span></h2>
   </div>
   <p class="section-sub">One-click governance: <b>sanctioned</b> means approved, <b>review</b> means decide soon, <b>blocked</b> means pull its access. Changing a status here only updates the record — you still revoke the real credential yourself.</p>
+  <div class="reg-filters" id="reg-filters">
+    <input type="search" id="reg-q" placeholder="Search name, owner, platform…" aria-label="Search agents" autocomplete="off">
+    <div class="fchips" id="reg-band" role="radiogroup" aria-label="Risk band">
+      <button class="fchip on" data-v="all">All bands</button>
+      <button class="fchip" data-v="high">High</button>
+      <button class="fchip" data-v="medium">Medium</button>
+      <button class="fchip" data-v="low">Low</button>
+    </div>
+    <div class="fchips" id="reg-status" role="radiogroup" aria-label="Governance status">
+      <button class="fchip on" data-v="all">All statuses</button>
+      <button class="fchip" data-v="sanctioned">Sanctioned</button>
+      <button class="fchip" data-v="review">Review</button>
+      <button class="fchip" data-v="blocked">Blocked</button>
+    </div>
+    <span class="reg-count" id="reg-count"></span>
+  </div>
   <div id="registry"></div>
 </section>
 

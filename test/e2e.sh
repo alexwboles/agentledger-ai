@@ -131,6 +131,45 @@ const badImport = R.importLedger('{"agents":[{"name":"NoId"}]}');
 const notJson = R.importLedger('nope');
 (notJson.errors.length === 1) ? ok('flow11: non-JSON rejected') : bad('flow11: non-JSON accepted');
 
+// Flow 12: risk history — snapshots accumulate daily, trend reflects score changes
+const th = clone(newcomer); th.id = 'a-tr'; th.name = 'TrendBot';
+R.recordRiskSnapshot(th, '2026-09-13');
+const scoreEarly = R.computeRisk(th).score;
+th.tools.push({ tool: 'smtp', perms: ['send'] }); // riskier a month later
+th.humanReview = false;
+R.recordRiskSnapshot(th, '2026-10-13');
+const trend = R.riskTrend(th, 30);
+const scoreLate = R.computeRisk(th).score;
+(trend && trend.delta === scoreLate - scoreEarly && trend.delta > 0)
+  ? ok('flow12: risk trend climbs after new egress permission (' + scoreEarly + ' -> ' + scoreLate + ')')
+  : bad('flow12: trend wrong: ' + JSON.stringify(trend));
+const flat = clone(newcomer); flat.id = 'a-fl';
+R.recordRiskSnapshot(flat, '2026-10-13');
+(R.riskTrend(flat) === null)
+  ? ok('flow12: single-day history has no trend yet')
+  : bad('flow12: phantom trend');
+
+// Flow 13: remediation plan — fix the heaviest factor, projected score drops
+const fx = clone(newcomer); fx.id = 'a-fx'; fx.name = 'FixBot';
+fx.tools = [{ tool: 'prod-postgres', perms: ['read'] }, { tool: 'slack', perms: ['send'] }];
+fx.data = ['prod-db', 'PII']; fx.humanReview = false; fx.tokenAgeDays = 200;
+const fp0 = R.fixPlanProgress(fx);
+if (!(fp0.score >= 60 && fp0.pendingCount > 0)) throw new Error('flow13 setup: expected a high-risk agent');
+const sorted = fp0.factors.slice().sort((x, y) => y.weight - x.weight);
+sorted.forEach(f => R.toggleFix(fx, f.id)); // carry out everything
+const fpAll = R.fixPlanProgress(fx);
+(fpAll.pendingCount === 0 && fpAll.projected === 0)
+  ? ok('flow13: completing all fixes projects 0/100 (from ' + fp0.score + ')')
+  : bad('flow13: projected=' + fpAll.projected + ' pending=' + fpAll.pendingCount);
+const pendAll = R.pendingFixes([fx]);
+(pendAll.length === 0) ? ok('flow13: no pending fixes once everything is checked off') : bad('flow13: phantom pending fixes');
+const fx2 = clone(newcomer); fx2.id = 'a-fx2'; fx2.name = 'FixBot2';
+fx2.tools = fx.tools; fx2.data = fx.data; fx2.humanReview = false; fx2.tokenAgeDays = 200;
+const pendSome = R.pendingFixes([fx2]);
+(pendSome.length > 0 && pendSome.every(f => f.agentName && f.fix))
+  ? ok('flow13: pending fixes list names agent + concrete fix (' + pendSome.length + ' items)')
+  : bad('flow13: pendingFixes shape wrong');
+
 console.log('---');
 console.log('---');
 console.log('e2e: ' + pass + ' passed, ' + fail + ' failed');

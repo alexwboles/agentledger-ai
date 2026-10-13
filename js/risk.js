@@ -346,6 +346,21 @@
       lines.push("  - Recommended: " + f.action);
     });
     lines.push("");
+    lines.push("## Remediation plan");
+    lines.push("");
+    var fixes = pendingFixes(agents);
+    if (!fixes.length) {
+      lines.push("Every risk factor in the estate has a checked-off fix. Nothing pending.");
+    } else {
+      lines.push("Pending fixes, heaviest first. Carrying all of these out would drop the " +
+        "estate's total risk weight substantially — check each one off in the agent drawer as you complete it.");
+      lines.push("");
+      fixes.forEach(function (f) {
+        lines.push("- **[" + f.severity.toUpperCase() + "] " + f.agentName + " — " + f.label + "** (" + f.weight + " pts)");
+        lines.push("  - Do this: " + f.fix);
+      });
+    }
+    lines.push("");
     lines.push("## Value");
     lines.push("");
     var totalCost = agents.reduce(function (s, a) { return s + (Number(a.costPerMonth) || 0); }, 0);
@@ -393,6 +408,81 @@
         return { agent: a, risk: computeRisk(a), nextReview: nextReviewISO(a, now) };
       })
       .sort(function (x, y) { return y.risk.score - x.risk.score; });
+  }
+
+  // ----------------------------------------------------- risk history
+  // One score snapshot per day per agent (persisted in agent.scoreHistory).
+  // Lets the ledger show whether an agent is getting safer or scarier.
+  function recordRiskSnapshot(agent, today) {
+    var now = today || todayISO();
+    agent.scoreHistory = agent.scoreHistory || [];
+    var last = agent.scoreHistory[agent.scoreHistory.length - 1];
+    var score = computeRisk(agent).score;
+    if (last && last.d === now) last.s = score; // refresh today's snapshot
+    else agent.scoreHistory.push({ d: now, s: score });
+    if (agent.scoreHistory.length > 90) agent.scoreHistory = agent.scoreHistory.slice(-90);
+    return agent;
+  }
+
+  // Score delta vs the earliest snapshot inside the last `days` days.
+  // Returns null when there are fewer than two days of history.
+  function riskTrend(agent, days) {
+    var hist = agent.scoreHistory || [];
+    if (hist.length < 2) return null;
+    days = days || 30;
+    var now = hist[hist.length - 1];
+    var cutoff = addDaysISO(now.d, -days);
+    var old = null;
+    for (var i = 0; i < hist.length; i++) {
+      if (hist[i].d >= cutoff) { old = hist[i]; break; }
+    }
+    if (!old || old.d === now.d) return null;
+    return { delta: now.s - old.s, from: old, to: now };
+  }
+
+  // -------------------------------------------------- remediation planner
+  // Each risk factor already carries a concrete fix. The planner turns them
+  // into a checkable to-do list per agent and estimates the score after the
+  // checked fixes are carried out. Progress persists on the agent record.
+  function fixPlanProgress(agent) {
+    var factors = computeRisk(agent).factors;
+    var total = factors.reduce(function (s, f) { return s + f.weight; }, 0);
+    var score = Math.min(100, total);
+    var plan = agent.fixPlan || {};
+    var done = factors.filter(function (f) { return plan[f.id] && plan[f.id].done; });
+    var doneW = done.reduce(function (s, f) { return s + f.weight; }, 0);
+    return {
+      factors: factors,
+      score: score,
+      doneCount: done.length,
+      pendingCount: factors.length - done.length,
+      projected: Math.max(0, score - doneW)
+    };
+  }
+
+  function toggleFix(agent, factorId, today) {
+    agent.fixPlan = agent.fixPlan || {};
+    var cur = agent.fixPlan[factorId];
+    if (cur && cur.done) delete agent.fixPlan[factorId];
+    else agent.fixPlan[factorId] = { done: true, date: today || todayISO() };
+    return agent;
+  }
+
+  /** Estate-wide pending fixes, heaviest first — for the audit pack. */
+  function pendingFixes(agents) {
+    var out = [];
+    (agents || []).forEach(function (a) {
+      var p = fixPlanProgress(a);
+      p.factors.forEach(function (f) {
+        var planned = (a.fixPlan || {})[f.id];
+        if (!planned || !planned.done) {
+          out.push({ agentName: a.name, label: f.label, weight: f.weight,
+            severity: f.severity, fix: f.fix });
+        }
+      });
+    });
+    out.sort(function (x, y) { return y.weight - x.weight; });
+    return out;
   }
 
   // ----------------------------------------------------- ledger backup
@@ -446,6 +536,11 @@
     reviewCadence: reviewCadence,
     nextReviewISO: nextReviewISO,
     reviewsDue: reviewsDue,
+    recordRiskSnapshot: recordRiskSnapshot,
+    riskTrend: riskTrend,
+    fixPlanProgress: fixPlanProgress,
+    toggleFix: toggleFix,
+    pendingFixes: pendingFixes,
     exportLedger: exportLedger,
     importLedger: importLedger,
     todayISO: todayISO
