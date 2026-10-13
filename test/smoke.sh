@@ -29,6 +29,30 @@ else
 fi
 grep -q "prefers-reduced-motion" css/style.css && ok "css respects prefers-reduced-motion" || bad "css missing reduced-motion"
 
+# 4b. CSS has no rounded corners (Alex's rule) except the zero reset
+if grep -E "border-radius:[[:space:]]*[^0!]" css/style.css | grep -qv "border-radius: 0"; then
+  bad "css contains non-zero border-radius"
+else
+  ok "css: zero rounded corners"
+fi
+
+# 4c. All CSS custom properties referenced are defined
+UNDEF=$(grep -o "var(--[a-z0-9-]*)" css/style.css | sort -u | sed 's/var(--//;s/)//' | while read v; do
+  grep -q -- "--$v:" css/style.css || echo "$v"
+done)
+if [ -z "$UNDEF" ]; then
+  ok "css: all var() references resolve"
+else
+  bad "css: undefined vars: $(echo $UNDEF | tr '\n' ' ')"
+fi
+
+# 4d. Redesign chrome present: sidebar nav badges + findings severity tabs
+for id in nav-findings nav-high nav-shadow find-tabs crumb-sec; do
+  grep -q "id=\"$id\"" index.html && ok "index.html has #$id" || bad "index.html missing #$id"
+done
+grep -q "findLevel" js/app.js && ok "app.js wires findings severity filter" || bad "app.js missing findLevel"
+grep -q "renderNav" js/app.js && ok "app.js renders sidebar nav badges" || bad "app.js missing renderNav"
+
 # 5+. logic checks via node
 node << 'NODEEOF'
 const R = require('/home/hatch/workspace/agentledger-ai/js/risk.js');

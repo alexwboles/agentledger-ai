@@ -18,7 +18,8 @@
     editingId: null,
     regQ: "",
     regBand: "all",     // all | high | medium | low
-    regStatus: "all"    // all | sanctioned | review | blocked
+    regStatus: "all",   // all | sanctioned | review | blocked
+    findLevel: "all"    // all | block | warn | info
   };
 
   // Record one risk snapshot per agent per day, so trends can be drawn.
@@ -117,7 +118,6 @@
     ];
     byId("kpis").innerHTML = cards.map(function (c, i) {
       return '<div class="kpi' + (c.alert ? " alert" : "") + '">' +
-        '<div class="kpi-folio">FIG. ' + (i + 1) + '</div>' +
         '<div class="kpi-value">' + esc(c.value) + '</div>' +
         '<div class="kpi-label">' + esc(c.label) + '</div>' +
         '<div class="kpi-sub">' + esc(c.sub) + '</div></div>';
@@ -295,8 +295,20 @@
 
   // -------------------------------------------------------------- findings
   function renderFindings() {
-    var f = R.buildFindings(S.agents);
+    var all = R.buildFindings(S.agents);
+    var f = S.findLevel === "all" ? all : all.filter(function (x) { return x.level === S.findLevel; });
     var pill = { block: "BLOCK", warn: "WARN", info: "INFO" };
+    var counts = { all: all.length, block: 0, warn: 0, info: 0 };
+    all.forEach(function (x) { counts[x.level]++; });
+    var tabs = byId("find-tabs");
+    if (tabs) {
+      Array.prototype.forEach.call(tabs.querySelectorAll(".ftab"), function (t) {
+        var v = t.getAttribute("data-v");
+        t.classList.toggle("on", v === S.findLevel);
+        t.innerHTML = esc(t.getAttribute("data-label")) +
+          '<span class="fcount">' + counts[v] + "</span>";
+      });
+    }
     byId("findings").innerHTML =
       '<div class="feed-head"><span class="feed-k">FINDINGS</span><span class="feed-n">' + f.length + '</span></div>' +
       '<div class="feed-list">' +
@@ -837,6 +849,24 @@
   }
 
   // --------------------------------------------------------------- render
+  function setBadge(id, n) {
+    var el = byId(id);
+    if (!el) return;
+    if (n > 0) { el.textContent = n; el.hidden = false; }
+    else { el.textContent = ""; el.hidden = true; }
+  }
+
+  // Sidebar nav badges — Drata-style live counts.
+  function renderNav() {
+    var risks = S.agents.map(riskOf);
+    var high = risks.filter(function (r) { return r.band === "high"; }).length;
+    var shadow = S.agents.filter(function (a) { return !a.registered; }).length;
+    var findings = R.buildFindings(S.agents).length;
+    setBadge("nav-findings", findings);
+    setBadge("nav-high", high);
+    setBadge("nav-shadow", shadow);
+  }
+
   function renderAll() {
     renderKpis();
     renderMap();
@@ -844,6 +874,7 @@
     renderRegistry();
     renderShadow();
     renderReviews();
+    renderNav();
     if (S.drawer) renderDrawer();
   }
 
@@ -905,6 +936,24 @@
           S[pair[1]] = c.getAttribute("data-v");
           renderRegistry();
         });
+      });
+    });
+    // Findings severity tabs.
+    var ft = byId("find-tabs");
+    if (ft) Array.prototype.forEach.call(ft.querySelectorAll(".ftab"), function (t) {
+      t.addEventListener("click", function () {
+        S.findLevel = t.getAttribute("data-v");
+        renderFindings();
+      });
+    });
+    // Sidebar nav: active section + breadcrumb crumb.
+    var crumb = byId("crumb-sec");
+    Array.prototype.forEach.call(document.querySelectorAll(".snav"), function (a) {
+      a.addEventListener("click", function () {
+        Array.prototype.forEach.call(document.querySelectorAll(".snav"), function (x) {
+          x.classList.toggle("on", x === a);
+        });
+        if (crumb) crumb.textContent = a.getAttribute("data-label");
       });
     });
   }

@@ -9,85 +9,136 @@
 </head>
 <body>
 
-<header class="masthead">
-  <div class="brand">
-    <div class="brand-k">Est. 2026 · Folio Nº 001 · Solo-operator edition</div>
-    <h1>AgentLedger <span class="thin">— the register of agents</span></h1>
-    <p class="brand-sub">Every AI agent you run, <em>what it can reach</em>, how risky it is, and what to do about it.
-    AgentLedger <em>documents and scores</em> — it suggests what to revoke, it never pretends to be a firewall.</p>
+<aside class="side" aria-label="Primary">
+  <div class="side-brand">
+    <div class="side-k">Agent risk register</div>
+    <div class="side-word">AgentLedger</div>
+    <div class="side-sub">free &middot; self-hosted &middot; local-first</div>
   </div>
-  <div class="mast-actions">
-    <button class="btn ghost" id="btn-add">+ Register agent</button>
-    <button class="btn ghost" id="btn-reset">Restore demo</button>
-    <button class="btn ghost" id="btn-backup">Backup ledger</button>
-    <button class="btn ghost" id="btn-restore">Restore ledger</button>
-    <button class="btn primary" id="btn-export">Export audit pack</button>
-    <input type="file" id="restore-file" accept=".json,application/json" hidden>
+  <nav class="side-nav" aria-label="Sections">
+    <a href="#sec-overview" class="snav on" data-sec="overview" data-label="Overview">
+      <span class="snav-t">Overview</span>
+    </a>
+    <a href="#sec-map" class="snav" data-sec="map" data-label="Risk map &amp; findings">
+      <span class="snav-t">Risk map &amp; findings</span>
+      <span class="nbadge" id="nav-findings" hidden></span>
+    </a>
+    <a href="#sec-register" class="snav" data-sec="register" data-label="Risk register">
+      <span class="snav-t">Risk register</span>
+      <span class="nbadge warn" id="nav-high" hidden></span>
+    </a>
+    <a href="#sec-shadow" class="snav" data-sec="shadow" data-label="Shadow check">
+      <span class="snav-t">Shadow check</span>
+      <span class="nbadge warn" id="nav-shadow" hidden></span>
+    </a>
+  </nav>
+  <div class="side-foot">
+    <div class="side-note">Documents and scores. It suggests what to revoke — it never pretends to be a firewall.</div>
   </div>
-</header>
+</aside>
 
-<section class="kpis" id="kpis" aria-label="Estate key figures"></section>
-
-<section class="reviews" id="reviews" aria-label="Reviews due"></section>
-
-<main class="layout">
-  <section class="panel" aria-label="Risk map">
-    <div class="panel-head">
-      <h2>Risk map <span class="n">— the estate at a glance</span></h2>
-      <span class="panel-hint">Agents on the inner ring, tools on the outer ring</span>
+<div class="main">
+  <header class="topbar">
+    <div class="crumb"><span class="crumb-root">AgentLedger</span><span class="crumb-sep">/</span><span id="crumb-sec">Overview</span></div>
+    <div class="top-actions">
+      <button class="btn ghost" id="btn-add">+ Register agent</button>
+      <button class="btn ghost" id="btn-reset">Restore demo</button>
+      <button class="btn ghost" id="btn-backup">Backup ledger</button>
+      <button class="btn ghost" id="btn-restore">Restore ledger</button>
+      <button class="btn primary" id="btn-export">Export audit pack</button>
+      <input type="file" id="restore-file" accept=".json,application/json" hidden>
     </div>
-    <div id="mapwrap"></div>
-    <div class="blast" id="blast"></div>
-    <div class="map-legend">
-      <span><i style="background:#4caf7d"></i>low risk</span>
-      <span><i style="background:#d9a441"></i>medium risk</span>
-      <span><i style="background:#e0604f"></i>high risk</span>
-      <span><span class="dash-demo"></span>shadow / unregistered</span>
-      <span>number on node = risk score</span>
-    </div>
-  </section>
+  </header>
 
-  <aside class="panel" aria-label="Findings">
-    <div id="findings"></div>
-  </aside>
-</main>
+  <main class="content">
+    <section class="sec" id="sec-overview" aria-label="Overview">
+      <div class="sec-head">
+        <div>
+          <h2>Overview</h2>
+          <p class="sec-sub">Estate health at a glance — every agent you run, <b>what it can reach</b>, how risky it is, and what to do about it.</p>
+        </div>
+      </div>
+      <div class="kpis" id="kpis" aria-label="Estate key figures"></div>
+      <div class="reviews" id="reviews" aria-label="Reviews due"></div>
+    </section>
 
-<section class="section">
-  <div class="section-head">
-    <h2>The registry <span class="n">— every agent, on the books</span></h2>
-  </div>
-  <p class="section-sub">One-click governance: <b>sanctioned</b> means approved, <b>review</b> means decide soon, <b>blocked</b> means pull its access. Changing a status here only updates the record — you still revoke the real credential yourself.</p>
-  <div class="reg-filters" id="reg-filters">
-    <input type="search" id="reg-q" placeholder="Search name, owner, platform…" aria-label="Search agents" autocomplete="off">
-    <div class="fchips" id="reg-band" role="radiogroup" aria-label="Risk band">
-      <button class="fchip on" data-v="all">All bands</button>
-      <button class="fchip" data-v="high">High</button>
-      <button class="fchip" data-v="medium">Medium</button>
-      <button class="fchip" data-v="low">Low</button>
-    </div>
-    <div class="fchips" id="reg-status" role="radiogroup" aria-label="Governance status">
-      <button class="fchip on" data-v="all">All statuses</button>
-      <button class="fchip" data-v="sanctioned">Sanctioned</button>
-      <button class="fchip" data-v="review">Review</button>
-      <button class="fchip" data-v="blocked">Blocked</button>
-    </div>
-    <span class="reg-count" id="reg-count"></span>
-  </div>
-  <div id="registry"></div>
-</section>
+    <section class="sec" id="sec-map" aria-label="Risk map and findings">
+      <div class="sec-head">
+        <div>
+          <h2>Risk map <span class="h2-sub">&amp; findings</span></h2>
+          <p class="sec-sub">How risk connects and spreads. Select a node to run a blast-radius simulation and open its remediation plan.</p>
+        </div>
+      </div>
+      <div class="layout">
+        <section class="panel panel-map" aria-label="Risk map">
+          <div class="panel-head">
+            <h3>Risk map</h3>
+            <span class="panel-hint">Agents on the inner ring, tools on the outer ring</span>
+          </div>
+          <div id="mapwrap"></div>
+          <div class="blast" id="blast"></div>
+          <div class="map-legend">
+            <span><i class="lg low"></i>low risk</span>
+            <span><i class="lg med"></i>medium risk</span>
+            <span><i class="lg high"></i>high risk</span>
+            <span><span class="dash-demo"></span>shadow / unregistered</span>
+            <span class="dim">number on node = risk score</span>
+          </div>
+        </section>
+        <aside class="panel panel-find" aria-label="Findings">
+          <div class="find-tabs" id="find-tabs" role="tablist" aria-label="Finding severity">
+            <button class="ftab on" data-v="all" data-label="All" role="tab">All</button>
+            <button class="ftab" data-v="block" data-label="Block" role="tab">Block</button>
+            <button class="ftab" data-v="warn" data-label="Warn" role="tab">Warn</button>
+            <button class="ftab" data-v="info" data-label="Info" role="tab">Info</button>
+          </div>
+          <div id="findings"></div>
+        </aside>
+      </div>
+    </section>
 
-<section class="section">
-  <div class="section-head">
-    <h2>Shadow check <span class="n">— what did we miss?</span></h2>
-  </div>
-  <p class="section-sub">Discovery scans five local sources and compares them against your registered agents. Anything found but not registered is a shadow agent — the ones that skip every control you set up.</p>
-  <div class="panel" id="shadow"></div>
-</section>
+    <section class="sec" id="sec-register" aria-label="Risk register">
+      <div class="sec-head">
+        <div>
+          <h2>Risk register</h2>
+          <p class="sec-sub">One-click governance: <b>sanctioned</b> means approved, <b>review</b> means decide soon, <b>blocked</b> means pull its access. Changing a status here only updates the record — you still revoke the real credential yourself.</p>
+        </div>
+      </div>
+      <div class="reg-filters" id="reg-filters">
+        <input type="search" id="reg-q" placeholder="Search name, owner, platform…" aria-label="Search agents" autocomplete="off">
+        <div class="fchips" id="reg-band" role="radiogroup" aria-label="Risk band">
+          <button class="fchip on" data-v="all">All bands</button>
+          <button class="fchip" data-v="high">High</button>
+          <button class="fchip" data-v="medium">Medium</button>
+          <button class="fchip" data-v="low">Low</button>
+        </div>
+        <div class="fchips" id="reg-status" role="radiogroup" aria-label="Governance status">
+          <button class="fchip on" data-v="all">All statuses</button>
+          <button class="fchip" data-v="sanctioned">Sanctioned</button>
+          <button class="fchip" data-v="review">Review</button>
+          <button class="fchip" data-v="blocked">Blocked</button>
+        </div>
+        <span class="reg-count" id="reg-count"></span>
+      </div>
+      <div id="registry"></div>
+    </section>
 
-<footer>
-  <div class="fine">AgentLedger is a self-hosted documentation and scoring tool. It cannot see your real credentials, enforce blocks, or revoke access — every "recommended" action is a suggestion for you to carry out. Data stays in this browser (localStorage); nothing leaves your machine.</div>
-  <div>AgentLedger · product Nº 55 · free &amp; local-first</div>
-</footer>
+    <section class="sec" id="sec-shadow" aria-label="Shadow check">
+      <div class="sec-head">
+        <div>
+          <h2>Shadow check</h2>
+          <p class="sec-sub">Discovery scans five local sources and compares them against your registered agents. Anything found but not registered is a shadow agent — the ones that skip every control you set up.</p>
+        </div>
+      </div>
+      <div class="panel" id="shadow"></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="fine">AgentLedger is a self-hosted documentation and scoring tool. It cannot see your real credentials, enforce blocks, or revoke access — every "recommended" action is a suggestion for you to carry out. Data stays in this browser (localStorage); nothing leaves your machine.</div>
+    <div>AgentLedger &middot; free &amp; local-first</div>
+  </footer>
+</div>
 
 <div id="scrim"></div>
 <aside id="drawer" aria-label="Agent details"></aside>
